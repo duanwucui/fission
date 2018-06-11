@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package router
+package canaryconfigmgr
 
 import (
 	"log"
-	"net/url"
-	"time"
+	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -27,8 +26,8 @@ import (
 )
 
 type (
-	functionServiceMap struct {
-		cache *cache.Cache // map[metadataKey]*url.URL
+	canaryConfigCancelFuncMap struct {
+		cache *cache.Cache // map[metadataKey]*context.Context
 	}
 
 	// metav1.ObjectMeta is not hashable, so we make a hashable copy
@@ -40,9 +39,9 @@ type (
 	}
 )
 
-func makeFunctionServiceMap(expiry time.Duration) *functionServiceMap {
-	return &functionServiceMap{
-		cache: cache.MakeCache(expiry, 0),
+func makecanaryConfigCancelFuncMap() *canaryConfigCancelFuncMap {
+	return &canaryConfigCancelFuncMap{
+		cache: cache.MakeCache(0, 0),
 	}
 }
 
@@ -54,31 +53,28 @@ func keyFromMetadata(m *metav1.ObjectMeta) *metadataKey {
 	}
 }
 
-func (fmap *functionServiceMap) lookup(f *metav1.ObjectMeta) (*url.URL, error) {
+func (cancelFuncMap *canaryConfigCancelFuncMap) lookup(f *metav1.ObjectMeta) (*context.CancelFunc, error) {
 	mk := keyFromMetadata(f)
-	item, err := fmap.cache.Get(*mk)
+	item, err := cancelFuncMap.cache.Get(*mk)
 	if err != nil {
 		return nil, err
 	}
-	u := item.(*url.URL)
-	return u, nil
+	ctx := item.(*context.CancelFunc)
+	return ctx, nil
 }
 
-func (fmap *functionServiceMap) assign(f *metav1.ObjectMeta, serviceUrl *url.URL) {
+func (cancelFuncMap *canaryConfigCancelFuncMap) assign(f *metav1.ObjectMeta, cancelFunc *context.CancelFunc) {
 	mk := keyFromMetadata(f)
-	err, old := fmap.cache.Set(*mk, serviceUrl)
+	err, _ := cancelFuncMap.cache.Set(*mk, cancelFunc)
 	if err != nil {
-		log.Printf("Comparing serviceUrl with oldUrl, serviceUrl.Host = %v , oldUrl.Host = %v", serviceUrl.Host, old.(*url.URL).Host)
-		log.Printf("Also dumping serviceUrl obj %+v, old : %+v", *serviceUrl, *(old.(*url.URL)))
-		if *serviceUrl == *(old.(*url.URL)) {
-			return
-		}
-		log.Printf("error caching service url for function with a different value: %v", err)
 		// ignore error
+		log.Printf("error caching cancelFunc for canaryConfig %s, err : %v", f.Name, err)
 	}
+	return
 }
 
-func (fmap *functionServiceMap) remove(f *metav1.ObjectMeta) error {
+func (cancelFuncMap *canaryConfigCancelFuncMap) remove(f *metav1.ObjectMeta) error {
 	mk := keyFromMetadata(f)
-	return fmap.cache.Delete(*mk)
+	return cancelFuncMap.cache.Delete(*mk)
 }
+

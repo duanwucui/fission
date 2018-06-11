@@ -18,16 +18,18 @@ package controller
 
 import (
 	"log"
+	"context"
 
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
+	"github.com/fission/fission/canaryconfigmgr"
 )
 
 func Start(port int) {
 	// setup a signal handler for SIGTERM
 	fission.SetupStackTraceHandler()
 
-	fc, _, apiExtClient, err := crd.MakeFissionClient()
+	fc, kc, apiExtClient, err := crd.MakeFissionClient()
 	if err != nil {
 		log.Fatalf("Failed to connect to K8s API: %v", err)
 	}
@@ -41,6 +43,11 @@ func Start(port int) {
 	if err != nil {
 		log.Fatalf("Error waiting for CRDs: %v", err)
 	}
+
+	canaryCfgMgr := canaryconfigmgr.MakeCanaryConfigMgr(fc, kc, fc.GetCrdClient())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	canaryCfgMgr.Run(ctx)
 
 	api, err := MakeAPI()
 	if err != nil {

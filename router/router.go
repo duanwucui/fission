@@ -54,6 +54,7 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
+	"github.com/fission/fission/canaryconfigmgr"
 )
 
 // request url ---[mux]---> Function(name,uid) ----[fmap]----> k8s service url
@@ -124,13 +125,14 @@ func Start(port int, executorUrl string) {
 		log.Fatalf("Failed to parse max retry times: %v", err)
 	}
 
-	triggers, _, fnStore := makeHTTPTriggerSet(fmap, frmap, trmap, fissionClient, kubeClient, executor, restClient,
-		&tsRoundTripperParams{
-			timeout:         timeout,
-			timeoutExponent: timeoutExponent,
-			keepAlive:       keepAlive,
-			maxRetries:      maxRetries,
-		})
+	setupCanaryLoadBalancer()
+
+	triggers, _, fnStore := makeHTTPTriggerSet(fmap, frmap, trmap, fissionClient, kubeClient, executor, restClient, &tsRoundTripperParams{
+		timeout:         timeout,
+		timeoutExponent: timeoutExponent,
+		keepAlive:       keepAlive,
+		maxRetries:      maxRetries,
+	})
 
 	resolver := makeFunctionReferenceResolver(fnStore)
 

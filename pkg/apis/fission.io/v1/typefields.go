@@ -18,6 +18,7 @@ package v1
 
 import (
 	apiv1 "k8s.io/api/core/v1"
+	"time"
 )
 
 type (
@@ -185,6 +186,10 @@ type (
 
 		// Name of the function.
 		Name string `json:"name"`
+
+		// Function Reference by weight. this map contains function name as key and its weight
+		// as the value.
+		FunctionWeights map[string]int `json:"functionweights"`
 	}
 
 	//
@@ -327,5 +332,19 @@ type (
 	TimeTriggerSpec struct {
 		Cron              string `json:"cron"`
 		FunctionReference `json:"functionref"`
+	}
+
+
+	FailureType string
+
+	// Canary Config
+	CanaryConfigSpec struct {
+		Trigger string `json:"trigger"`
+		FunctionN string `json:"funcn"`
+		FunctionNminus1 string `json:"funcn-1"`
+		WeightIncrement int `json:"weightincrement"`
+		WeightIncrementDuration time.Duration `json:"duration"`
+		FailureThreshold int `json:"failurethreshold"`
+		FailureType FailureType `json:"failureType"`
 	}
 )

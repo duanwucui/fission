@@ -157,13 +157,16 @@ func main() {
 
 	// httptriggers
 	htNameFlag := cli.StringFlag{Name: "name", Usage: "HTTP Trigger name"}
-	htFnNameFlag := cli.StringFlag{Name: "function", Usage: "Function name"}
+	//htFnNameFlag := cli.StringFlag{Name: "function", Usage: "Function name"}
 	htHostFlag := cli.StringFlag{Name: "host", Usage: "FQDN of the network host for route"}
 	htIngressFlag := cli.BoolFlag{Name: "createingress", Usage: "Creates ingress with same URL, defaults to false"}
+	htFnNameFlag := cli.StringSliceFlag{Name: "function", Usage: "Function name. Multiple functions can be supplied by reusing this flag multiple times for canary deployment"}
+	htFnWeightFlag := cli.IntSliceFlag{Name: "weight", Usage: "Weight for each function supplied with --function flag, in the same order. Used for canary deployment"}
+
 	htSubcommands := []cli.Command{
 
-		{Name: "create", Aliases: []string{"add"}, Usage: "Create HTTP trigger", Flags: []cli.Flag{htMethodFlag, htUrlFlag, htFnNameFlag, htHostFlag, htIngressFlag, fnNamespaceFlag, specSaveFlag}, Action: htCreate},
-		{Name: "get", Usage: "Get HTTP trigger", Flags: []cli.Flag{htMethodFlag, htUrlFlag}, Action: htGet},
+		{Name: "create", Aliases: []string{"add"}, Usage: "Create HTTP trigger", Flags: []cli.Flag{htNameFlag, htMethodFlag, htUrlFlag, htFnNameFlag, htHostFlag, htIngressFlag, fnNamespaceFlag, specSaveFlag, htFnWeightFlag}, Action: htCreate},
+		{Name: "get", Usage: "Get HTTP trigger", Flags: []cli.Flag{htNameFlag}, Action: htGet},
 		{Name: "update", Usage: "Update HTTP trigger", Flags: []cli.Flag{htNameFlag, triggerNamespaceFlag, htFnNameFlag, htHostFlag, htIngressFlag}, Action: htUpdate},
 		{Name: "delete", Usage: "Delete HTTP trigger", Flags: []cli.Flag{htNameFlag, triggerNamespaceFlag}, Action: htDelete},
 		{Name: "list", Usage: "List HTTP triggers", Flags: []cli.Flag{triggerNamespaceFlag}, Action: htList},
@@ -303,6 +306,29 @@ func main() {
 		{Name: "helm", Usage: "Create a helm chart from the app specification", Flags: []cli.Flag{specDirFlag}, Action: specHelm},
 	}
 
+	// metrics only for testing
+	fnMetricsNameFlag := cli.StringFlag{Name: "function", Usage: "function name"}
+	urlFlag := cli.StringFlag{Name: "url", Usage: "relative url"}
+	urlMethodFlag := cli.StringFlag{Name: "method", Usage: "http method"}
+	windowFlag := cli.StringFlag{Name: "window", Usage: "time window string in time.Duration format https://golang.org/pkg/time/#ParseDuration"}
+	metricsSubCommands := []cli.Command{
+		{Name: "total-count", Usage: "total count of requests for url", Flags: []cli.Flag{urlFlag, urlMethodFlag, windowFlag, fnMetricsNameFlag}, Action: metricsTotalReqCount},
+		{Name: "error", Usage: "count of errored requests to function", Flags: []cli.Flag{fnMetricsNameFlag, windowFlag, urlFlag, urlMethodFlag}, Action: metricsTotalErrorCount},
+	}
+
+	// canary configs
+	canaryConfigNameFlag := cli.StringFlag{Name: "name", Usage: "CanaryConfig name"}
+	triggerNameFlag := cli.StringFlag{Name: "trigger", Usage: "http trigger that this config references"}
+	funcNFlag := cli.StringFlag{Name: "funcN", Usage: "new version of the function"}
+	funcNminus1Flag := cli.StringFlag{Name: "funcN-1", Usage: "old stable version of the function"}
+	weightIncrementFlag := cli.IntFlag{Name: "increment-step", Usage: "weight increment step for function"}
+	incrementIntervalFlag := cli.StringFlag{Name: "increment-interval", Usage: "weight increment interval, string representation of time.Duration, ex : 1m, 2h, 2d"}
+	failureThresholdFlag := cli.IntFlag{Name: "failure-threshold", Usage: "threshold in percentage beyond which the new version of the function is considered unstable"}
+	canarySubCommands := []cli.Command{
+		{Name: "create", Usage: "create a canary config", Flags: []cli.Flag{canaryConfigNameFlag, fnNamespaceFlag, triggerNameFlag, funcNFlag, funcNminus1Flag, weightIncrementFlag, incrementIntervalFlag, failureThresholdFlag}, Action: canaryConfigCreate},
+		{Name: "get", Usage: "view parameters in a canary config", Flags: []cli.Flag{canaryConfigNameFlag}, Action: canaryConfigGet},
+	}
+
 	app.Commands = []cli.Command{
 		{Name: "function", Aliases: []string{"fn"}, Usage: "Create, update and manage functions", Subcommands: fnSubcommands},
 		{Name: "httptrigger", Aliases: []string{"ht", "route"}, Usage: "Manage HTTP triggers (routes) for functions", Subcommands: htSubcommands},
@@ -317,6 +343,9 @@ func main() {
 		{Name: "spec", Aliases: []string{"specs"}, Usage: "Manage a declarative app specification", Subcommands: specSubCommands},
 		{Name: "upgrade", Aliases: []string{}, Usage: "Upgrade tool from fission v0.1", Subcommands: upgradeSubCommands},
 		cmdPlugin,
+		{Name: "metrics", Aliases: []string{}, Usage: "prometheus metrics", Subcommands: metricsSubCommands},
+		{Name: "canary-config", Aliases: []string{}, Usage: "canary config", Subcommands: canarySubCommands},
+
 	}
 	app.Before = cliHook
 	app.CommandNotFound = handleCommandNotFound

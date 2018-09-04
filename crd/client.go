@@ -228,13 +228,9 @@ func (fc *FissionClient) Recorders(ns string) RecorderInterface {
 func (fc *FissionClient) Packages(ns string) PackageInterface {
 	return MakePackageInterface(fc.crdClient, ns)
 }
-<<<<<<< HEAD
-=======
 func (fc *FissionClient) CanaryConfigs(ns string) CanaryConfigInterface {
 	return MakeCanaryConfigInterface(fc.crdClient, ns)
 }
-
->>>>>>> Squash all commits.
 func (fc *FissionClient) WaitForCRDs() error {
 	return waitForCRDs(fc.crdClient)
 }

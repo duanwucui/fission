@@ -16,9 +16,12 @@ limitations under the License.
 
 package controller
 
+
 import (
 	"encoding/json"
 	"net/http"
+	"time"
+	"log"
 )
 
 func (a *API) TotalRequestsToFunc(w http.ResponseWriter, r *http.Request) {
@@ -29,14 +32,14 @@ func (a *API) TotalRequestsToFunc(w http.ResponseWriter, r *http.Request) {
 	timeDurationStr := a.extractQueryParamFromRequest(r, "window")
 	fn := a.extractQueryParamFromRequest(r, "function")
 	fns := a.extractQueryParamFromRequest(r, "namespace")
-	//timeDuration, err := time.ParseDuration(timeDurationStr)
-	//if err != nil {
-	//	log.Printf("Error parsing time duration :%v", err)
-	//	a.respondWithError(w, err)
-	//	return
-	//}
+	timeDuration, err := time.ParseDuration(timeDurationStr)
+	if err != nil {
+		log.Printf("Error parsing time duration :%v", err)
+		a.respondWithError(w, err)
+		return
+	}
 
-	result, err := a.promClient.GetTotalRequestToFunc(url, method, fn, fns, timeDurationStr, false)
+	result, err := a.promClient.GetTotalRequestToFunc(url, method, fn, fns, timeDuration)
 	if err != nil {
 		a.respondWithError(w, err)
 		return
@@ -58,15 +61,15 @@ func (a *API) TotalErrRequestCount(w http.ResponseWriter, r *http.Request) {
 	fns := a.extractQueryParamFromRequest(r, "namespace")
 	url := a.extractQueryParamFromRequest(r, "path")
 	timeDurationStr := a.extractQueryParamFromRequest(r, "window")
-	//timeDuration, err := time.ParseDuration(timeDurationStr)
-	//if err != nil {
-	//	log.Printf("Error parsing time duration :%v", err)
-	//	a.respondWithError(w, err)
-	//	return
-	//}
+	timeDuration, err := time.ParseDuration(timeDurationStr)
+	if err != nil {
+		log.Printf("Error parsing time duration :%v", err)
+		a.respondWithError(w, err)
+		return
+	}
 	method := a.extractQueryParamFromRequest(r, "method")
 
-	result, err := a.promClient.GetTotalFailedRequestsToFunc(fn, fns, url, method, timeDurationStr, false)
+	result, err := a.promClient.GetTotalFailedRequestsToFunc(fn, fns, url, method, timeDuration)
 	if err != nil {
 		a.respondWithError(w, err)
 		return

@@ -54,7 +54,6 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
-	"github.com/fission/fission/canaryconfigmgr"
 )
 
 // request url ---[mux]---> Function(name,uid) ----[fmap]----> k8s service url

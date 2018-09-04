@@ -131,7 +131,6 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			continue
 		}
 
-<<<<<<< HEAD
 		var recorderName string
 		recorder, err := ts.recorderSet.triggerRecorderMap.lookup(trigger.Metadata.Name)
 		if err == nil && recorder != nil {
@@ -140,29 +139,19 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 
 		//log.Printf("The trigger %v should be recorded: %v", trigger.Metadata.Name, doRecord)
 
-		if rr.resolveResultType != resolveResultSingleFunction {
-=======
 		if rr.resolveResultType != resolveResultSingleFunction && rr.resolveResultType != resolveResultMultipleFunctions {
->>>>>>> Squash all commits.
 			// not implemented yet
 			log.Panicf("resolve result type not implemented (%v)", rr.resolveResultType)
 		}
 
 		fh := &functionHandler{
-<<<<<<< HEAD
 			fmap:                 ts.functionServiceMap,
 			frmap:                ts.recorderSet.functionRecorderMap,
 			trmap:                ts.recorderSet.triggerRecorderMap,
-			function:             rr.functionMetadata,
 			executor:             ts.executor,
 			httpTrigger:          &trigger,
-=======
-			fmap:         ts.functionServiceMap,
 			functionMetadataMap:  rr.functionMetadataMap,
 			fnWeightDistributionList: rr.functionWtDistributionList,
-			executor:     ts.executor,
-			httpTrigger:  &trigger,
->>>>>>> Squash all commits.
 			tsRoundTripperParams: ts.tsRoundTripperParams,
 			recorderName:         recorderName,
 		}

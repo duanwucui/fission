@@ -8,7 +8,6 @@ import (
 	promApi1 "github.com/prometheus/client_golang/api/prometheus"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
-	"math"
 )
 
 type PrometheusApiClient struct {

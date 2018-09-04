@@ -44,7 +44,10 @@ func Start(port int) {
 		log.Fatalf("Error waiting for CRDs: %v", err)
 	}
 
-	canaryCfgMgr := canaryconfigmgr.MakeCanaryConfigMgr(fc, kc, fc.GetCrdClient())
+	canaryCfgMgr, err := canaryconfigmgr.MakeCanaryConfigMgr(fc, kc, fc.GetCrdClient())
+	if err != nil {
+		log.Fatalf("Failed to start canary config manager: %v", err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	canaryCfgMgr.Run(ctx)

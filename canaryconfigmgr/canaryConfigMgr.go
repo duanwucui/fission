@@ -30,8 +30,6 @@ import (
 
 	"github.com/fission/fission/crd"
 	"fmt"
-	"regexp"
-	"strings"
 )
 
 type canaryConfigMgr struct {
@@ -262,7 +260,7 @@ func(canaryCfgMgr *canaryConfigMgr) deleteCanaryConfig(canaryConfig *crd.CanaryC
 	log.Printf("Delete event received for canary config : %v, %v, %v", canaryConfig.Metadata.Name, canaryConfig.Metadata.Namespace, canaryConfig.Metadata.ResourceVersion)
 	cancelFunc, err := canaryCfgMgr.canaryCfgCancelFuncMap.lookup(&canaryConfig.Metadata)
 	if err != nil {
-		//log.Printf("Something's wrong, lookup of canaryConfig failed, err : %v", err)
+		log.Printf("Something's wrong, lookup of canaryConfig failed, err : %v", err)
 		return
 	}
 	// when this is called, the ctx.Done returns inside processCanaryConfig function and processing gets stopped

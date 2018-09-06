@@ -62,8 +62,8 @@ func canaryConfigCreate(c *cli.Context) error {
 	}
 
 	htTrigger, err := client.HTTPTriggerGet(m)
-	if htTrigger != nil {
-		checkErr(err, "get http trigger")
+	if err != nil {
+		checkErr(err,"Trigger referenced in the canary config is not created")
 	}
 
 	// check that the trigger has function reference type function weights
@@ -72,6 +72,8 @@ func canaryConfigCreate(c *cli.Context) error {
 	}
 
 	// check that the trigger references same functions in the function weights
+	// TODO : Uncomment the following
+	/*
 	_, ok := htTrigger.Spec.FunctionReference.FunctionWeights[funcN]
 	if !ok {
 		log.Fatal(fmt.Sprintf("HTTP Trigger doesn't reference the function %s in Canary Config", funcN))
@@ -81,6 +83,7 @@ func canaryConfigCreate(c *cli.Context) error {
 	if !ok {
 		log.Fatal(fmt.Sprintf("HTTP Trigger doesn't reference the function %s in Canary Config", funcNminus1))
 	}
+	*/
 
 	canaryCfg := &crd.CanaryConfig {
 		Metadata: metav1.ObjectMeta {

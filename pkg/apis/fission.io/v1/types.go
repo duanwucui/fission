@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"github.com/Azure/azure-sdk-for-go/arm/analysisservices"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -172,7 +173,8 @@ type (
 	CanaryConfig struct {
 		metav1.TypeMeta `json:",inline"`
 		Metadata        metav1.ObjectMeta       `json:"metadata"`
-		Spec            CanaryConfigSpec `json:"spec"`
+		Spec            CanaryConfigSpec 		`json:"spec"`
+		Status 			CanaryConfigStatus		`json:"status"`
 	}
 
 	// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

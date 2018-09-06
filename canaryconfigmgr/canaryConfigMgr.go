@@ -30,6 +30,7 @@ import (
 
 	"github.com/fission/fission/crd"
 	"fmt"
+	"github.com/fission/fission"
 )
 
 type canaryConfigMgr struct {
@@ -45,7 +46,7 @@ type canaryConfigMgr struct {
 func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernetes.Clientset, crdClient *rest.RESTClient) (*canaryConfigMgr, error) {
 
 	// TODO : Change this to use k8s service.
-	prometheusSvc := os.Getenv("PROMETHEUS_SERVER_SERVICE_HOST")
+	prometheusSvc := os.Getenv("BOISTEROUS_CRICKET_PROMETHEUS_SERVER_SERVICE_HOST")
 	if prometheusSvc == "" {
 		log.Printf("Error finding prometheus Service, Env : %v", os.Environ())
 		return nil, fmt.Errorf("prometheus service not found, cant create canary deployments")
@@ -84,7 +85,8 @@ func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				oldConfig := oldObj.(*crd.CanaryConfig)
 				newConfig := newObj.(*crd.CanaryConfig)
-				if oldConfig.Metadata.ResourceVersion != newConfig.Metadata.ResourceVersion {
+				if oldConfig.Metadata.ResourceVersion != newConfig.Metadata.ResourceVersion &&
+					oldConfig.Spec.FailureThreshold != newConfig.Spec.FailureThreshold {
 					go canaryCfgMgr.updateCanaryConfig(oldConfig, newConfig)
 				}
 				go canaryCfgMgr.reSyncCanaryConfigs()
@@ -110,7 +112,6 @@ func(canaryCfgMgr *canaryConfigMgr) addCanaryConfig(canaryConfig *crd.CanaryConf
 func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, canaryConfig *crd.CanaryConfig) {
 	ticker := time.NewTicker(canaryConfig.Spec.WeightIncrementDuration)
 	quit := make(chan struct{})
-	iteration := 0
 
 	for {
 		select {
@@ -121,14 +122,11 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			return
 
 		case <- ticker.C:
-			iteration += 1
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
-
-			log.Printf("Processing canary config : %s, iteration : %d", canaryConfig.Metadata.Name, iteration)
-			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &iteration)
-
+			log.Printf("Processing canary config : %s, iteration : %d", canaryConfig.Metadata.Name)
+			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit)
 
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
@@ -140,7 +138,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 	}
 }
 
-func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}, iteration *int) {
+func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}) {
 	// get the http trigger object associated with this canary config
 	triggerObj, err := canaryCfgMgr.getHttpTriggerObject(canaryConfig.Spec.Trigger, canaryConfig.Metadata.Namespace)
 	if err != nil {
@@ -149,9 +147,9 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		return
 	}
 
-	if *iteration != 1 {
-		//log.Printf("value of getLatestValueFromMetrics : %v, iteration : %v", getLatestValueFromMetrics, *iteration)
-		failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
+	if triggerObj.Spec.FunctionReference.Type == fission.FunctionReferenceTypeFunctionWeights &&
+		triggerObj.Spec.FunctionReference.FunctionWeights[canaryConfig.Spec.FunctionN] != 0 {
+		failurePercent, err := canaryCfgMgr.GetFunctionFailurePercentage(canaryConfig.Metadata.Name, triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
 			canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration)
 
 		if err != nil {
@@ -191,6 +189,37 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		return
 	}
 	//log.Printf("Finished this iteration of incrementWeightOrRollback for canaryConfig : %s", canaryConfig.Metadata.Name)
+}
+
+func(canaryCfgMgr *canaryConfigMgr) GetFunctionFailurePercentage(canaryConfigName, path, method, funcName, funcNs string, window time.Duration) (float64, error) {
+	// get the canary config object
+	canaryConfig, err := canaryCfgMgr.fissionClient.CanaryConfigs(funcNs).Get(canaryConfigName)
+	if err != nil {
+		// silently ignore and wait for next window
+		return 0, err
+	}
+
+	// first get a total count of requests to this url in a time window
+	totalRequestToUrl, err := canaryCfgMgr.promClient.GetTotalRequestToFunc(path, method, funcName, funcNs, window, canaryConfig.Status.RequestsToFuncN)
+	if err != nil {
+		return 0, err
+	}
+
+	if totalRequestToUrl == 0 {
+		return -1, fmt.Errorf("no requests to this url %v and method %v in the window : %v", path, method, window)
+	}
+
+	// next, get a total count of errored out requests to this function in the same window
+	totalFailedRequestToFunc, err := canaryCfgMgr.promClient.GetTotalFailedRequestsToFunc(funcName, funcNs, path, method, window, canaryConfig.Status.FailedRequestsToFuncN)
+	if err != nil {
+		return 0, err
+	}
+
+	// calculate the failure percentage of the function
+	failurePercentForFunc := (totalFailedRequestToFunc / totalRequestToUrl) * 100
+	log.Printf("Final failurePercentForFunc for func: %v.%v is %v", funcName, funcNs, failurePercentForFunc)
+
+	return failurePercentForFunc, nil
 }
 
 func(canaryCfgMgr *canaryConfigMgr) getHttpTriggerObject(triggerName, triggerNamespace string) (*crd.HTTPTrigger, error) {
@@ -279,3 +308,5 @@ func(canaryCfgMgr *canaryConfigMgr) updateCanaryConfig(oldCanaryConfig *crd.Cana
 	}
 	canaryCfgMgr.addCanaryConfig(newCanaryConfig)
 }
+
+

@@ -337,7 +337,7 @@ type (
 
 	FailureType string
 
-	// Canary Config
+	// Canary Config Spec
 	CanaryConfigSpec struct {
 		Trigger string `json:"trigger"`
 		FunctionN string `json:"funcn"`
@@ -346,5 +346,11 @@ type (
 		WeightIncrementDuration time.Duration `json:"duration"`
 		FailureThreshold int `json:"failurethreshold"`
 		FailureType FailureType `json:"failureType"`
+	}
+
+	// Canary Config Status
+	CanaryConfigStatus struct {
+		RequestsToFuncN int `json:"req"`
+		FailedRequestsToFuncN int `json:"failedreq"`
 	}
 )

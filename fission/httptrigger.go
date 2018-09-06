@@ -180,7 +180,7 @@ func htCreate(c *cli.Context) error {
 		return nil
 	}
 
-	_, err := client.HTTPTriggerCreate(ht)
+	_, err = client.HTTPTriggerCreate(ht)
 	checkErr(err, "create HTTP trigger")
 
 	fmt.Printf("trigger '%v' created\n", triggerName)
@@ -240,7 +240,8 @@ func htUpdate(c *cli.Context) error {
 	if c.IsSet("function") {
 		ht.Spec.FunctionReference.Name = c.String("function")
 	}
-	checkFunctionExistence(client, ht.Spec.FunctionReference.Name, triggerNamespace)
+
+	//checkFunctionExistence(client, ht.Spec.FunctionReference.Name, triggerNamespace)
 
 	if c.IsSet("createingress") {
 		ht.Spec.CreateIngress = c.Bool("createingress")

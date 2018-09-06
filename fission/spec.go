@@ -1026,12 +1026,6 @@ func localArchiveFromSpec(specDir string, aus *ArchiveUploadSpec) (*fission.Arch
 	}
 }
 
-// specHelm creates a helm chart from a spec directory and a
-// deployment config.
-func specHelm(c *cli.Context) error {
-	return nil
-}
-
 func mapKey(m *metav1.ObjectMeta) string {
 	return fmt.Sprintf("%v:%v", m.Namespace, m.Name)
 }

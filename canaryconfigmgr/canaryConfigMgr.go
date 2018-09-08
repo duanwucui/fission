@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/fields"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/fission/fission/crd"
 	"fmt"
@@ -67,8 +68,6 @@ func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernete
 	return configMgr, nil
 }
 
-// TODO : If fn updated once canary config is processed completely, we probably have to restart processing the corresponding canary config
-// That requires us to have a func watcher that basically calls `addCanaryConfig` in the occurrance of such an event.
 func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store, k8sCache.Controller) {
 	resyncPeriod := 30 * time.Second
 	listWatch := k8sCache.NewListWatchFromClient(canaryCfgMgr.crdClient, "canaryconfigs", metav1.NamespaceAll, fields.Everything())
@@ -110,7 +109,13 @@ func(canaryCfgMgr *canaryConfigMgr) addCanaryConfig(canaryConfig *crd.CanaryConf
 }
 
 func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, canaryConfig *crd.CanaryConfig) {
-	ticker := time.NewTicker(canaryConfig.Spec.WeightIncrementDuration)
+	interval, err := time.ParseDuration(canaryConfig.Spec.WeightIncrementDuration)
+	if err != nil {
+		log.Printf("Error parsing duration: %v, cant proceed with this canaryConfig : %v.%v", err,
+			canaryConfig.Metadata.Name, canaryConfig.Metadata.Namespace)
+		return
+	}
+	ticker := time.NewTicker(interval)
 	quit := make(chan struct{})
 
 	for {
@@ -140,7 +145,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 
 func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}) {
 	// get the http trigger object associated with this canary config
-	triggerObj, err := canaryCfgMgr.getHttpTriggerObject(canaryConfig.Spec.Trigger, canaryConfig.Metadata.Namespace)
+	triggerObj, err := canaryCfgMgr.fissionClient.HTTPTriggers(canaryConfig.Spec.Trigger).Get(canaryConfig.Metadata.Namespace)
 	if err != nil {
 		// just silently ignore. wait for next window to increment weight
 		log.Printf("Error fetching http trigger object, err : %v", err)
@@ -149,7 +154,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 
 	if triggerObj.Spec.FunctionReference.Type == fission.FunctionReferenceTypeFunctionWeights &&
 		triggerObj.Spec.FunctionReference.FunctionWeights[canaryConfig.Spec.FunctionN] != 0 {
-		failurePercent, err := canaryCfgMgr.GetFunctionFailurePercentage(canaryConfig.Metadata.Name, triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
+		failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
 			canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration)
 
 		if err != nil {
@@ -166,8 +171,6 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 			return
 		}
 
-		// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
-		// change it to do a get and then update inside rollback
 		if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
 			log.Printf("Failure percent %v crossed the threshold %v, so rolling back", failurePercent, canaryConfig.Spec.FailureThreshold)
 			canaryCfgMgr.rollback(canaryConfig, triggerObj)
@@ -188,64 +191,49 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		close(quit)
 		return
 	}
-	//log.Printf("Finished this iteration of incrementWeightOrRollback for canaryConfig : %s", canaryConfig.Metadata.Name)
 }
 
-func(canaryCfgMgr *canaryConfigMgr) GetFunctionFailurePercentage(canaryConfigName, path, method, funcName, funcNs string, window time.Duration) (float64, error) {
-	// get the canary config object
-	canaryConfig, err := canaryCfgMgr.fissionClient.CanaryConfigs(funcNs).Get(canaryConfigName)
-	if err != nil {
-		// silently ignore and wait for next window
-		return 0, err
+func(canaryCfgMgr *canaryConfigMgr) updateHttpTriggerWithRetries(triggerName, triggerNamespace string, fnWeights map[string]int) (err error){
+	for i := 0; i < fission.MaxRetries; i++ {
+		triggerObj, err := canaryCfgMgr.fissionClient.HTTPTriggers(triggerNamespace).Get(triggerName)
+		if err != nil {
+			log.Printf("Error getting http trigger object : %v", err)
+			return err
+		}
+
+		triggerObj.Spec.FunctionReference.FunctionWeights = fnWeights
+
+		_, err = canaryCfgMgr.fissionClient.HTTPTriggers(triggerNamespace).Update(triggerObj)
+		switch {
+		case err == nil:
+			log.Printf("Updated Http trigger : %s.%s", triggerName, triggerNamespace)
+			return nil
+		case k8serrors.IsConflict(err):
+			log.Printf("Conflict in updating http trigger : %s.%s, retrying", triggerName, triggerNamespace)
+			continue
+		default:
+			log.Printf("Error updating trigger : %s.%s = %v", triggerName, triggerNamespace, err)
+			return err
+		}
 	}
 
-	// first get a total count of requests to this url in a time window
-	totalRequestToUrl, err := canaryCfgMgr.promClient.GetTotalRequestToFunc(path, method, funcName, funcNs, window, canaryConfig.Status.RequestsToFuncN)
-	if err != nil {
-		return 0, err
-	}
-
-	if totalRequestToUrl == 0 {
-		return -1, fmt.Errorf("no requests to this url %v and method %v in the window : %v", path, method, window)
-	}
-
-	// next, get a total count of errored out requests to this function in the same window
-	totalFailedRequestToFunc, err := canaryCfgMgr.promClient.GetTotalFailedRequestsToFunc(funcName, funcNs, path, method, window, canaryConfig.Status.FailedRequestsToFuncN)
-	if err != nil {
-		return 0, err
-	}
-
-	// calculate the failure percentage of the function
-	failurePercentForFunc := (totalFailedRequestToFunc / totalRequestToUrl) * 100
-	log.Printf("Final failurePercentForFunc for func: %v.%v is %v", funcName, funcNs, failurePercentForFunc)
-
-	return failurePercentForFunc, nil
-}
-
-func(canaryCfgMgr *canaryConfigMgr) getHttpTriggerObject(triggerName, triggerNamespace string) (*crd.HTTPTrigger, error) {
-	// TODO : Add retries
-	return canaryCfgMgr.fissionClient.HTTPTriggers(triggerNamespace).Get(triggerName)
+	return err
 }
 
 func(canaryCfgMgr *canaryConfigMgr) rollback(canaryConfig *crd.CanaryConfig, trigger *crd.HTTPTrigger) error {
-	// TODO : Add retries
 	functionWeights := trigger.Spec.FunctionReference.FunctionWeights
 	functionWeights[canaryConfig.Spec.FunctionN] = 0
 	functionWeights[canaryConfig.Spec.FunctionNminus1] = 100
 
-	trigger.Spec.FunctionReference.FunctionWeights = functionWeights
-
-	_, err := canaryCfgMgr.fissionClient.HTTPTriggers(trigger.Metadata.Namespace).Update(trigger)
+	err := canaryCfgMgr.updateHttpTriggerWithRetries(trigger.Metadata.Name, trigger.Metadata.Namespace, functionWeights)
 	if err != nil {
-		log.Printf("Error updating http trigger object, err : %v", err)
 		return err
 	}
-	//log.Printf("Successfully updated http trigger for rollback : %v", trigger.Metadata.Name)
+
 	return nil
 }
 
 func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryConfig, trigger *crd.HTTPTrigger) (bool, error) {
-	// TODO : Add retries
 	doneProcessingCanaryConfig := false
 
 	functionWeights := trigger.Spec.FunctionReference.FunctionWeights
@@ -263,15 +251,12 @@ func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryCon
 	}
 
 	log.Printf("Final incremented functionWeights : %v", functionWeights)
-	trigger.Spec.FunctionReference.FunctionWeights = functionWeights
 
-	_, err := canaryCfgMgr.fissionClient.HTTPTriggers(trigger.Metadata.Namespace).Update(trigger)
+	err := canaryCfgMgr.updateHttpTriggerWithRetries(trigger.Metadata.Name, trigger.Metadata.Namespace, functionWeights)
 	if err != nil {
-		log.Printf("Error updating http trigger object, err : %v", err)
 		return doneProcessingCanaryConfig, err
 	}
 
-	//log.Printf("Successfully updated http trigger obj for incrementWeights : %s", trigger.Metadata.Name)
 	return doneProcessingCanaryConfig, nil
 }
 

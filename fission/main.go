@@ -306,16 +306,6 @@ func main() {
 		{Name: "helm", Usage: "Create a helm chart from the app specification", Flags: []cli.Flag{specDirFlag}, Action: specHelm},
 	}
 
-	// metrics only for testing
-	fnMetricsNameFlag := cli.StringFlag{Name: "function", Usage: "function name"}
-	urlFlag := cli.StringFlag{Name: "url", Usage: "relative url"}
-	urlMethodFlag := cli.StringFlag{Name: "method", Usage: "http method"}
-	windowFlag := cli.StringFlag{Name: "window", Usage: "time window string in time.Duration format https://golang.org/pkg/time/#ParseDuration"}
-	metricsSubCommands := []cli.Command{
-		{Name: "total-count", Usage: "total count of requests for url", Flags: []cli.Flag{urlFlag, urlMethodFlag, windowFlag, fnMetricsNameFlag}, Action: metricsTotalReqCount},
-		{Name: "error", Usage: "count of errored requests to function", Flags: []cli.Flag{fnMetricsNameFlag, windowFlag, urlFlag, urlMethodFlag}, Action: metricsTotalErrorCount},
-	}
-
 	// canary configs
 	canaryConfigNameFlag := cli.StringFlag{Name: "name", Usage: "CanaryConfig name"}
 	triggerNameFlag := cli.StringFlag{Name: "trigger", Usage: "http trigger that this config references"}
@@ -343,7 +333,6 @@ func main() {
 		{Name: "spec", Aliases: []string{"specs"}, Usage: "Manage a declarative app specification", Subcommands: specSubCommands},
 		{Name: "upgrade", Aliases: []string{}, Usage: "Upgrade tool from fission v0.1", Subcommands: upgradeSubCommands},
 		cmdPlugin,
-		{Name: "metrics", Aliases: []string{}, Usage: "prometheus metrics", Subcommands: metricsSubCommands},
 		{Name: "canary-config", Aliases: []string{}, Usage: "canary config", Subcommands: canarySubCommands},
 
 	}

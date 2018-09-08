@@ -52,7 +52,7 @@ func canaryConfigCreate(c *cli.Context) error {
 	incrementInterval:= c.String("increment-interval")
 
 	// check for time parsing
-	timeDuration, err := time.ParseDuration(incrementInterval)
+	_, err := time.ParseDuration(incrementInterval)
 	checkErr(err, "parsing time duration.")
 
 	// check that the trigger exists in the same namespace.
@@ -95,7 +95,7 @@ func canaryConfigCreate(c *cli.Context) error {
 			FunctionN: funcN,
 			FunctionNminus1: funcNminus1,
 			WeightIncrement: incrementStep,
-			WeightIncrementDuration:  timeDuration,
+			WeightIncrementDuration:  incrementInterval,
 			FailureThreshold: failureThreshold,
 			FailureType: fission.FailureTypeStatusCode,
 		},

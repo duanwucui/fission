@@ -343,14 +343,8 @@ type (
 		FunctionN string `json:"funcn"`
 		FunctionNminus1 string `json:"funcn-1"`
 		WeightIncrement int `json:"weightincrement"`
-		WeightIncrementDuration time.Duration `json:"duration"`
+		WeightIncrementDuration string `json:"duration"`
 		FailureThreshold int `json:"failurethreshold"`
 		FailureType FailureType `json:"failureType"`
-	}
-
-	// Canary Config Status
-	CanaryConfigStatus struct {
-		RequestsToFuncN int `json:"req"`
-		FailedRequestsToFuncN int `json:"failedreq"`
 	}
 )

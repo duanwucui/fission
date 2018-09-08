@@ -37,6 +37,11 @@ type (
 		Namespace       string
 		ResourceVersion string
 	}
+
+	//cacheValue struct {
+	//	cancelFunc *context.CancelFunc
+	//
+	//}
 )
 
 func makecanaryConfigCancelFuncMap() *canaryConfigCancelFuncMap {

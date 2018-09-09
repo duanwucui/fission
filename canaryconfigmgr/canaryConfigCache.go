@@ -54,7 +54,6 @@ func keyFromMetadata(m *metav1.ObjectMeta) *metadataKey {
 	return &metadataKey{
 		Name:            m.Name,
 		Namespace:       m.Namespace,
-		ResourceVersion: m.ResourceVersion,
 	}
 }
 

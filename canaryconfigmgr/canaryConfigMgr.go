@@ -130,7 +130,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
-			log.Printf("Processing canary config : %s, iteration : %d", canaryConfig.Metadata.Name)
+			log.Printf("Processing canary config : %s.%s", canaryConfig.Metadata.Name, canaryConfig.Metadata.Namespace)
 			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit)
 
 		case <- quit:
@@ -145,7 +145,8 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 
 func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}) {
 	// get the http trigger object associated with this canary config
-	triggerObj, err := canaryCfgMgr.fissionClient.HTTPTriggers(canaryConfig.Spec.Trigger).Get(canaryConfig.Metadata.Namespace)
+	log.Printf("Trigger : %s", canaryConfig.Spec.Trigger)
+	triggerObj, err := canaryCfgMgr.fissionClient.HTTPTriggers(canaryConfig.Metadata.Namespace).Get(canaryConfig.Spec.Trigger)
 	if err != nil {
 		// just silently ignore. wait for next window to increment weight
 		log.Printf("Error fetching http trigger object, err : %v", err)
@@ -226,11 +227,7 @@ func(canaryCfgMgr *canaryConfigMgr) rollback(canaryConfig *crd.CanaryConfig, tri
 	functionWeights[canaryConfig.Spec.FunctionNminus1] = 100
 
 	err := canaryCfgMgr.updateHttpTriggerWithRetries(trigger.Metadata.Name, trigger.Metadata.Namespace, functionWeights)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryConfig, trigger *crd.HTTPTrigger) (bool, error) {
@@ -253,11 +250,7 @@ func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryCon
 	log.Printf("Final incremented functionWeights : %v", functionWeights)
 
 	err := canaryCfgMgr.updateHttpTriggerWithRetries(trigger.Metadata.Name, trigger.Metadata.Namespace, functionWeights)
-	if err != nil {
-		return doneProcessingCanaryConfig, err
-	}
-
-	return doneProcessingCanaryConfig, nil
+	return doneProcessingCanaryConfig, err
 }
 
 func(canaryCfgMgr *canaryConfigMgr) reSyncCanaryConfigs() {

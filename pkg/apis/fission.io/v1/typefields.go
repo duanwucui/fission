@@ -18,7 +18,6 @@ package v1
 
 import (
 	apiv1 "k8s.io/api/core/v1"
-	"time"
 )
 
 type (

@@ -106,6 +106,8 @@ func main() {
 	pkgNamespaceFlag := cli.StringFlag{Name: "pkgNamespace, pkgns", Value: metav1.NamespaceDefault, Usage: "Namespace for package object"}
 	triggerNamespaceFlag := cli.StringFlag{Name: "triggerNamespace, triggerns", Value: metav1.NamespaceDefault, Usage: "Namespace for trigger object"}
 	recorderNamespaceFlag := cli.StringFlag{Name: "recorderNamespace, recorderns", Value: metav1.NamespaceDefault, Usage: "Namespace for recorder object"}
+	canaryNamespaceFlag := cli.StringFlag{Name: "canaryNamespace, canaryns", Value: metav1.NamespaceDefault, Usage: "Namespace for canary config object"}
+
 
 	// trigger method and url flags (used in function and route CLIs)
 	htMethodFlag := cli.StringFlag{Name: "method", Value: "GET", Usage: "HTTP Method: GET|POST|PUT|DELETE|HEAD"}
@@ -314,9 +316,12 @@ func main() {
 	weightIncrementFlag := cli.IntFlag{Name: "increment-step", Usage: "weight increment step for function"}
 	incrementIntervalFlag := cli.StringFlag{Name: "increment-interval", Usage: "weight increment interval, string representation of time.Duration, ex : 1m, 2h, 2d"}
 	failureThresholdFlag := cli.IntFlag{Name: "failure-threshold", Usage: "threshold in percentage beyond which the new version of the function is considered unstable"}
-	canarySubCommands := []cli.Command{
-		{Name: "create", Usage: "create a canary config", Flags: []cli.Flag{canaryConfigNameFlag, fnNamespaceFlag, triggerNameFlag, funcNFlag, funcNminus1Flag, weightIncrementFlag, incrementIntervalFlag, failureThresholdFlag}, Action: canaryConfigCreate},
-		{Name: "get", Usage: "view parameters in a canary config", Flags: []cli.Flag{canaryConfigNameFlag}, Action: canaryConfigGet},
+	canarySubCommands := []cli.Command {
+		{Name: "create", Usage: "create a canary config", Flags: []cli.Flag{canaryConfigNameFlag, triggerNameFlag, funcNFlag, funcNminus1Flag, fnNamespaceFlag, weightIncrementFlag, incrementIntervalFlag, failureThresholdFlag}, Action: canaryConfigCreate},
+		{Name: "get", Usage: "view parameters in a canary config", Flags: []cli.Flag{canaryConfigNameFlag, canaryNamespaceFlag}, Action: canaryConfigGet},
+		{Name: "update", Usage: "update parameters of a canary config", Flags: []cli.Flag{canaryConfigNameFlag, canaryNamespaceFlag, incrementIntervalFlag, weightIncrementFlag, failureThresholdFlag}, Action: canaryConfigUpdate},
+		{Name: "delete", Usage: "delete a canary config", Flags: []cli.Flag{canaryConfigNameFlag, canaryNamespaceFlag, incrementIntervalFlag, weightIncrementFlag, failureThresholdFlag}, Action: canaryConfigDelete},
+		{Name: "list", Usage: "list all canary configs in a namespace", Flags: []cli.Flag{canaryNamespaceFlag}, Action: canaryConfigList},
 	}
 
 	app.Commands = []cli.Command{

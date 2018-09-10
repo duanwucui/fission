@@ -128,12 +128,93 @@ func canaryConfigGet(c *cli.Context) error {
 	canaryCfg, err := client.CanaryConfigGet(m)
 	checkErr(err, "get canary config")
 
-
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", "NAME", "TRIGGER", "FUNCTION-N", "FUNCTION-N-1", "WEIGHT-INCREMENT", "INTERVAL", "FAILURE-THRESHOLD", "FAILURE-TYPE")
 	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
 		canaryCfg.Metadata.Name, canaryCfg.Spec.Trigger, canaryCfg.Spec.FunctionN, canaryCfg.Spec.FunctionNminus1, canaryCfg.Spec.WeightIncrement, canaryCfg.Spec.WeightIncrementDuration,
 			canaryCfg.Spec.FailureThreshold, canaryCfg.Spec.FailureType)
+
+	w.Flush()
+	return nil
+}
+
+func canaryConfigUpdate(c *cli.Context) error {
+	client := getClient(c.GlobalString("server"))
+
+	canaryConfigName := c.String("name")
+	ns := c.String("canaryNamespace")
+	if len(canaryConfigName) == 0 {
+		log.Fatal("Need a name, use --name.")
+	}
+
+	incrementStep := c.Int("increment-step")
+	failureThreshold := c.Int("failure-threshold")
+	incrementInterval:= c.String("increment-interval")
+
+	// check for time parsing
+	_, err := time.ParseDuration(incrementInterval)
+	checkErr(err, "parsing time duration.")
+
+	// get the current config
+	m := &metav1.ObjectMeta{
+		Name:      canaryConfigName,
+		Namespace: ns,
+	}
+
+	canaryCfg, err := client.CanaryConfigGet(m)
+	checkErr(err, "get canary config")
+
+	if incrementStep != 0 {
+		canaryCfg.Spec.WeightIncrement = incrementStep
+	}
+
+	if failureThreshold != 0 {
+		canaryCfg.Spec.FailureThreshold = failureThreshold
+	}
+
+	if len(incrementInterval) > 0 {
+		canaryCfg.Spec.WeightIncrementDuration = incrementInterval
+	}
+
+	_, err = client.CanaryConfigUpdate(canaryCfg)
+	checkErr(err, "update canary config")
+
+	return nil
+}
+
+func canaryConfigDelete(c *cli.Context) error {
+	client := getClient(c.GlobalString("server"))
+
+	canaryConfigName := c.String("name")
+	ns := c.String("canaryNamespace")
+	if len(canaryConfigName) == 0 {
+		log.Fatal("Need a name, use --name.")
+	}
+
+	// get the current config
+	m := &metav1.ObjectMeta{
+		Name:      canaryConfigName,
+		Namespace: ns,
+	}
+
+	return client.CanaryConfigDelete(m)
+}
+
+func canaryConfigList(c *cli.Context) error {
+	client := getClient(c.GlobalString("server"))
+
+	ns := c.String("canaryNamespace")
+
+	canaryCfgs, err := client.CanaryConfigList(ns)
+	checkErr(err, "get canary config")
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", "NAME", "TRIGGER", "FUNCTION-N", "FUNCTION-N-1", "WEIGHT-INCREMENT", "INTERVAL", "FAILURE-THRESHOLD", "FAILURE-TYPE")
+	for _, canaryCfg := range canaryCfgs {
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+			canaryCfg.Metadata.Name, canaryCfg.Spec.Trigger, canaryCfg.Spec.FunctionN, canaryCfg.Spec.FunctionNminus1, canaryCfg.Spec.WeightIncrement, canaryCfg.Spec.WeightIncrementDuration,
+			canaryCfg.Spec.FailureThreshold, canaryCfg.Spec.FailureType)
+	}
 
 	w.Flush()
 	return nil

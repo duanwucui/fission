@@ -81,10 +81,6 @@ func (c *Client) CanaryConfigGet(m *metav1.ObjectMeta) (*crd.CanaryConfig, error
 
 func (c *Client) CanaryConfigUpdate(canaryConf *crd.CanaryConfig) (*metav1.ObjectMeta, error) {
 	// TODO : Add validation
-	//err := env.Validate()
-	//if err != nil {
-	//	return nil, fv1.AggregateValidationErrors("Environment", err)
-	//}
 
 	reqbody, err := json.Marshal(canaryConf)
 	if err != nil {

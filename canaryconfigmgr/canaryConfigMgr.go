@@ -84,8 +84,7 @@ func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				oldConfig := oldObj.(*crd.CanaryConfig)
 				newConfig := newObj.(*crd.CanaryConfig)
-				if oldConfig.Metadata.ResourceVersion != newConfig.Metadata.ResourceVersion &&
-					oldConfig.Spec.FailureThreshold != newConfig.Spec.FailureThreshold {
+				if oldConfig.Metadata.ResourceVersion != newConfig.Metadata.ResourceVersion {
 					go canaryCfgMgr.updateCanaryConfig(oldConfig, newConfig)
 				}
 				go canaryCfgMgr.reSyncCanaryConfigs()

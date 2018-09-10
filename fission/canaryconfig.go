@@ -35,18 +35,14 @@ func canaryConfigCreate(c *cli.Context) error {
 
 	canaryConfigName := c.String("name")
 	// canary configs can be created for functions in the same namespace
-	ns := c.String("fnNamespaceFlag")
 	if len(canaryConfigName) == 0 {
 		log.Fatal("Need a name, use --name.")
-	}
-
-	if len(ns) == 0 {
-		 ns = "default"
 	}
 
 	trigger := c.String("trigger")
 	funcN := c.String("funcN")
 	funcNminus1 := c.String("funcN-1")
+	ns := c.String("fnNamespaceFlag")
 	incrementStep := c.Int("increment-step")
 	failureThreshold := c.Int("failure-threshold")
 	incrementInterval:= c.String("increment-interval")
@@ -72,8 +68,6 @@ func canaryConfigCreate(c *cli.Context) error {
 	}
 
 	// check that the trigger references same functions in the function weights
-	// TODO : Uncomment the following
-	/*
 	_, ok := htTrigger.Spec.FunctionReference.FunctionWeights[funcN]
 	if !ok {
 		log.Fatal(fmt.Sprintf("HTTP Trigger doesn't reference the function %s in Canary Config", funcN))
@@ -83,8 +77,29 @@ func canaryConfigCreate(c *cli.Context) error {
 	if !ok {
 		log.Fatal(fmt.Sprintf("HTTP Trigger doesn't reference the function %s in Canary Config", funcNminus1))
 	}
-	*/
 
+	// check that the functions exist in the same namespace
+	m = &metav1.ObjectMeta {
+		Name:      funcN,
+		Namespace: ns,
+	}
+
+	_, err = client.FunctionGet(m)
+	if err != nil {
+		checkErr(err,fmt.Sprintf("Function: %s.%s referenced in the canary config is not created", funcN, ns))
+	}
+
+	m = &metav1.ObjectMeta {
+		Name:      funcNminus1,
+		Namespace: ns,
+	}
+
+	_, err = client.FunctionGet(m)
+	if err != nil {
+		checkErr(err,fmt.Sprintf("Function: %s.%s referenced in the canary config is not created", funcNminus1, ns))
+	}
+
+	// finally create canaryCfg in the same namespace as the functions referenced
 	canaryCfg := &crd.CanaryConfig {
 		Metadata: metav1.ObjectMeta {
 			Name:      canaryConfigName,
@@ -115,10 +130,7 @@ func canaryConfigGet(c *cli.Context) error {
 	if len(name) == 0 {
 		log.Fatal("Need a name, use --name.")
 	}
-	ns := c.String("namespace")
-	if ns == "" {
-		ns = "default"
-	}
+	ns := c.String("canaryNamespace")
 
 	m := &metav1.ObjectMeta{
 		Name:      name,
@@ -206,7 +218,7 @@ func canaryConfigList(c *cli.Context) error {
 	ns := c.String("canaryNamespace")
 
 	canaryCfgs, err := client.CanaryConfigList(ns)
-	checkErr(err, "get canary config")
+	checkErr(err, "list canary config")
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", "NAME", "TRIGGER", "FUNCTION-N", "FUNCTION-N-1", "WEIGHT-INCREMENT", "INTERVAL", "FAILURE-THRESHOLD", "FAILURE-TYPE")

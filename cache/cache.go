@@ -123,15 +123,6 @@ func (c *Cache) service() {
 				}
 			}
 			req.responseChannel <- resp
-		case FORCESET:
-			now := time.Now()
-			c.cache[req.key] = &Value{
-				value: req.value,
-				ctime: now,
-				atime: now,
-			}
-			resp.value = req.value
-			req.responseChannel <- resp
 		case DELETE:
 			delete(c.cache, req.key)
 			req.responseChannel <- resp

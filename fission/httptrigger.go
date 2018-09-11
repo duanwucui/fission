@@ -99,7 +99,7 @@ func htCreate(c *cli.Context) error {
 			Type: fission.FunctionReferenceTypeFunctionName,
 			Name: functionList[0],
 		}
-	} else {
+	} else if len(functionList) == 2 {
 		functionWeights := make(map[string]int, 0)
 		for index := range functionList {
 			functionWeights[functionList[index]] = functionWeightsList[index]
@@ -109,6 +109,8 @@ func htCreate(c *cli.Context) error {
 			Type:            fission.FunctionReferenceTypeFunctionWeights,
 			FunctionWeights: functionWeights,
 		}
+	} else {
+		log.Fatal("The number of functions in a trigger can be 1 or 2(for canary feature along with their weights)")
 	}
 
 	triggerName := c.String("name")
@@ -168,9 +170,6 @@ func htCreate(c *cli.Context) error {
 			CreateIngress:     createIngress,
 		},
 	}
-
-	//res2B, _ := json.Marshal(ht)
-	//fmt.Println(string(res2B))
 
 	// if we're writing a spec, don't call the API
 	if c.Bool("spec") {

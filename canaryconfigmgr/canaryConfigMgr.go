@@ -75,18 +75,23 @@ func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store
 		k8sCache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				canaryConfig := obj.(*crd.CanaryConfig)
+				log.Printf("ADD EVENT received for canaryConfig : %s", canaryConfig.Metadata.Name)
 				go canaryCfgMgr.addCanaryConfig(canaryConfig)
 			},
 			DeleteFunc: func(obj interface{}) {
 				canaryConfig := obj.(*crd.CanaryConfig)
+				log.Printf("DELETE EVENT received for canaryConfig : %s", canaryConfig.Metadata.Name)
 				go canaryCfgMgr.deleteCanaryConfig(canaryConfig)
 			},
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				oldConfig := oldObj.(*crd.CanaryConfig)
 				newConfig := newObj.(*crd.CanaryConfig)
 				if oldConfig.Metadata.ResourceVersion != newConfig.Metadata.ResourceVersion {
+					log.Printf("UPDATE EVENT received for canaryConfig : %s", oldConfig.Metadata.Name)
+
 					go canaryCfgMgr.updateCanaryConfig(oldConfig, newConfig)
 				}
+				log.Printf("RESYNC")
 				go canaryCfgMgr.reSyncCanaryConfigs()
 
 			},

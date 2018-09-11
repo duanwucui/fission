@@ -76,7 +76,7 @@ func(promApiClient *PrometheusApiClient) GetRequestsToFuncInWindow(path string, 
 		return 0, err
 	}
 
-	log.Printf("reqs : %v, reqsInPrevWindow : %v")
+	log.Printf("reqs : %v, reqsInPrevWindow : %v", reqs, reqsInPrevWindow)
 	reqsInCurrentWindow := reqs - reqsInPrevWindow
 	log.Printf("reqsInCurrentWindow to this function %v : %v", funcName, reqsInCurrentWindow)
 
@@ -102,7 +102,7 @@ func (promApiClient *PrometheusApiClient) GetTotalFailedRequestsToFuncInWindow(f
 		return 0, err
 	}
 
-	log.Printf("failedReqs : %v, failedReqsInPrevWindow : %v")
+	log.Printf("failedReqs : %v, failedReqsInPrevWindow : %v", failedRequests, failedReqsInPrevWindow)
 	failedReqsInCurrentWindow := failedRequests - failedReqsInPrevWindow
 	log.Printf("failedReqsInCurrentWindow to function: %v.%v : %v", funcName, funcNs, failedReqsInCurrentWindow)
 

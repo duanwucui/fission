@@ -42,7 +42,7 @@ func canaryConfigCreate(c *cli.Context) error {
 	trigger := c.String("trigger")
 	funcN := c.String("funcN")
 	funcNminus1 := c.String("funcN-1")
-	ns := c.String("fnNamespaceFlag")
+	ns := c.String("fnNamespace")
 	incrementStep := c.Int("increment-step")
 	failureThreshold := c.Int("failure-threshold")
 	incrementInterval:= c.String("increment-interval")
@@ -115,6 +115,8 @@ func canaryConfigCreate(c *cli.Context) error {
 			FailureType: fission.FailureTypeStatusCode,
 		},
 	}
+
+	fmt.Printf("Canary config name : %s, ns : %s, trigger : %s", canaryConfigName, ns, trigger)
 
 	_, err = client.CanaryConfigCreate(canaryCfg)
 	checkErr(err, "create canary config")

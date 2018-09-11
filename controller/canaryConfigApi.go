@@ -84,4 +84,70 @@ func (a *API) CanaryConfigApiGet(w http.ResponseWriter, r *http.Request) {
 	a.respondWithSuccess(w, resp)
 }
 
+func (a *API) CanaryConfigApiList(w http.ResponseWriter, r *http.Request) {
+	ns := a.extractQueryParamFromRequest(r, "namespace")
+	if len(ns) == 0 {
+		ns = metav1.NamespaceDefault
+	}
+
+	canaryCfgs, err := a.fissionClient.CanaryConfigs(ns).List(metav1.ListOptions{})
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	resp, err := json.Marshal(canaryCfgs.Items)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	a.respondWithSuccess(w, resp)
+}
+
+func (a *API) CanaryConfigApiUpdate(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	var c crd.CanaryConfig
+	err = json.Unmarshal(body, &c)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	canayCfgNew, err := a.fissionClient.CanaryConfigs(c.Metadata.Namespace).Update(&c)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	resp, err := json.Marshal(canayCfgNew.Metadata)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	a.respondWithSuccess(w, resp)
+}
+
+func (a *API) CanaryConfigApiDelete(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["canaryConfig"]
+	ns := a.extractQueryParamFromRequest(r, "namespace")
+	if len(ns) == 0 {
+		ns = metav1.NamespaceDefault
+	}
+
+	err := a.fissionClient.CanaryConfigs(ns).Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	a.respondWithSuccess(w, []byte(""))
+}
 
